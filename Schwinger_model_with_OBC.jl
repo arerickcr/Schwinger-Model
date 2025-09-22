@@ -186,19 +186,20 @@ function Schwinger(N,x,y,mu,theta,nsweeps,maxdim,spin)
   @show inner(psi3',Sx,psi3)
   return (energy0,energy1,energy2,energy3)
 end
+let
+  N = 8     # Number of lattice sites
+  x, y, theta = 10, 1, 0    # Specify parameters 
+  spin = 0
 
-N = 8     # Number of lattice sites
-x, y, theta = 10, 1, 0    # Specify parameters 
-spin = 0
+  # Plan to do nsweeps DMRG sweeps ground state:
+  nsweeps = 5
 
-# Plan to do nsweeps DMRG sweeps ground state:
-nsweeps = 5
+  # Set maximum MPS bond dimensions for each sweep (truncation m)
+  maxdim = 500
 
-# Set maximum MPS bond dimensions for each sweep (truncation m)
-maxdim = 500
-
-me=0.1
-#mu=0
-mu = 2*sqrt(x)*me - 1/4
-E0,E1,E2,E3 = Schwinger(N,x,y,mu,theta,nsweeps,maxdim,spin)   
-println("E0 = ", string(E0),"\nE1 = ", string(E1),"\nE2 = ", string(E2),"\nE3 = ", string(E3),"\n")
+  me=0.1
+  #mu=0
+  mu = 2*sqrt(x)*me - 1/4
+  E0,E1,E2,E3 = Schwinger(N,x,y,mu,theta,nsweeps,maxdim,spin)   
+  println("E0 = ", string(E0),"\nE1 = ", string(E1),"\nE2 = ", string(E2),"\nE3 = ", string(E3),"\n")
+end
