@@ -26,7 +26,7 @@ with $$\varepsilon=0$$ and $$L=0$$ for Open Boundary Conditions (OBC) and $$\var
 
 For the PBC case, since we have an extra (bosonic) degree of freedom $$L$$, then in order to describe the Hilbert space, we consider the basis $$\ket{s_{1}}\ket{s_{2}}\dots \ket{s_{N}}\ket{\ell}$$. Where $$L\ket{\ell}=\ell\ket{\ell}$$ and $$e^{\pm i\theta}\ket{\ell}=\ket{\ell \pm 1}$$ and $$\ell\in \mathbb{Z}$$. So, the Hilbert space is infinite dimensional, that means that we have to truncate our basis up to some fixed $$L_{max}$$. Thus $$-L_{max}\leq \ell \leq L_{max}$$ and there are $$(2L_{max}+1)$$ states for each chain of spins $$\ket{s_{1}}\ket{s_{2}}\dots \ket{s_{N}}$$. 
 
-For more details on the Schwinger model and its lattice representation, I have compiled a detailed set of notes HERE, which are based on the following papers:
+For more details on the Schwinger model and its lattice representation, I have compiled a detailed set of notes [here](https://earguelloc.com/pages/notes.html), which are based on the following papers:
 
 - [Schwinger, '62 (Gauge Invariance and Mass)] (https://doi.org/10.1103/PhysRev.125.397)
 - [Kogut and Susskind '75 (Hamiltonian formulation of Wilson’s lattice gauge theories)] (https://doi.org/10.1103/PhysRevD.11.395)
