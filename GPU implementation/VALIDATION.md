@@ -22,11 +22,7 @@ All **115 checks passed**, with no failures or errors:
 
 Physics defaults: x=10, y=1, mass=0.33, theta=pi, g=0. Initial spin is 0 for even N and +0.5 for odd N. The exact-matrix comparisons additionally covered N=2 through 6, theta=0,pi,0.73, g=0.17, y=0.8, mass=0.21.
 
-The original helper file was loaded unchanged inside a module. Its N=4 solver returned -21.854627410289932. Its N=20 driver was not run. SHA-256 values for both original files match `original_files.sha256`.
-
 The main tiny DMRG checks used nsweeps=16, maxdim=32, noise=0, eig_maxiter=8, and Float64. These are correctness checks with generous small-system accuracy, not the original ten-sweep benchmark. The original solver retains its own internal settings when invoked. The N=4 two-state test uses nsweeps=20, maxdim=16, eig_maxiter=10, noise=0. Per-run TOML records contain the exact settings.
-
-Environment: Julia 1.12.4, ITensors 0.9.31, ITensorMPS 0.4.1, Windows, four BLAS threads, one Julia thread. The manifest is synchronized with the new CPU project's declared dependencies. Seven top-level scripts pass `tests/check_syntax.jl`.
 
 **Not run:** NVIDIA execution, CPU/GPU agreement, N=10–20 benchmarking. Windows reported Intel UHD Graphics 620; no NVIDIA GPU was available. First-run CPU timings contain compilation costs and are not performance results.
 
