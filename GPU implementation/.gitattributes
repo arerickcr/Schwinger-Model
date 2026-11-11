@@ -1,0 +1,3 @@
+# Preserve the exact reference bytes recorded in original_files.sha256.
+reference/*.jl -text -whitespace
+*.pdf binary

@@ -1,0 +1,64 @@
+ITensorMPS_version = "0.4.1"
+ITensors_version = "0.9.31"
+absolute_overlaps = [[1.0, 5.43299132673794e-16], [5.43299132673794e-16, 1.0]]
+backend = "cpu"
+build_seconds = 0.0054138
+created_at = "2026-10-22T18:10:27.631"
+dmrg_seconds = 0.7533248
+julia_version = "1.12.4"
+transfer_seconds = 2.1e-5
+
+[hardware]
+blas_threads = 4
+cpu = "skylake"
+julia_threads = 1
+
+[model]
+N = 4
+g = 0.0
+mass = 0.33
+spin = 0.0
+theta = 3.141592653589793
+x = 10.0
+y = 1.0
+
+[solver]
+cutoff = 0.0
+eig_maxiter = 10
+eig_tol = 1.0e-14
+energy_tol = 1.0e-10
+krylovdim = 10
+maxdim = 16
+min_sweeps = 2
+noise = 0.0
+nsweeps = 20
+num_states = 2
+outputlevel = 0
+seed = 1234
+
+[[states]]
+dmrg_objective = -21.85462741028992
+energy = -21.854627410289932
+energy_converged = true
+maxlinkdim = 4
+norm2 = 0.9999999999999998
+residual_norm = 0.0
+state = 0
+sweep_energies = [-21.854627410289936, -21.85462741028992]
+sweep_max_truncation_error = [0.0, 0.0]
+sweeps = 2
+total_Sz = -4.163336342344337e-17
+variance_raw = 0.0
+[[states]]
+dmrg_objective = -15.31231201412561
+energy = -15.31231201412561
+energy_converged = true
+maxlinkdim = 3
+norm2 = 1.0
+residual_norm = 1.6858739404357614e-7
+state = 1
+sweep_energies = [-15.312312014125608, -15.31231201412561]
+sweep_max_truncation_error = [0.0, 0.0]
+sweeps = 2
+total_Sz = -1.0
+variance_raw = 2.842170943040401e-14

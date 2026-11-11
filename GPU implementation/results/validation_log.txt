@@ -1,0 +1,16 @@
+Test Summary:                 | Pass  Total  Time
+Initial states and validation |    8      8  4.8s
+Test Summary:                                          | Pass  Total     Time
+Hamiltonian: independent matrix and unchanged original |   60     60  3m47.1s
+N=4 DMRG=-21.85462741028993 exact=-21.854627410289932 error=3.552713678800501e-15
+After sweep 1 energy=-21.85462741028993  maxlinkdim=8 maxerr=0.00E+00 time=18.142
+After sweep 2 energy=-21.854627410289932  maxlinkdim=8 maxerr=0.00E+00 time=0.012
+Stopping DMRG after sweep 2, with energy convergence < 1.0e-10
+N=5 DMRG=-26.7175399777961 exact=-26.717539977796104 error=3.552713678800501e-15
+N=6 DMRG=-33.965949729130365 exact=-33.96594972913035 error=1.4210854715202004e-14
+Test Summary:                                                     | Pass  Total     Time
+CPU DMRG: exact energies, residuals, observables, original solver |   40     40  2m48.0s
+Test Summary:                            | Pass  Total  Time
+Excited states and near-zero convergence |    5      5  1.9s
+Test Summary:                   | Pass  Total  Time
+Generic backend and report path |    2      2  3.7s

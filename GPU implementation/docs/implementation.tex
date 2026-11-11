@@ -1,0 +1,160 @@
+\section{New files: what each one does}
+\begin{longtable}{p{0.29\textwidth}p{0.65\textwidth}}
+\toprule File & Purpose\\\midrule\endhead
+\code{SchwingerGPU.jl} & Model, shared solver, device interface, diagnostics, configuration, reporting, and comparisons.\\
+\code{CUDABackend.jl} & NVIDIA device selection, precision-preserving transfer, synchronization, and device metadata.\\
+\code{run_cpu.jl} & Small command-line entry point selecting the host backend.\\
+\code{run_cuda.jl} & Entry point selecting the NVIDIA backend.\\
+\code{setup_cuda.jl} & Installs CUDA in the new project on the intended machine. Does not launch DMRG.\\
+\code{check_cuda.jl} & Real-device storage and precision checks plus an $N=4$ CPU/GPU smoke comparison.\\
+\code{benchmark.jl} & Explicit $N=10,\ldots,20$ comparison with warmup, repeats, and median timing summaries.\\
+\code{tests/runtests.jl} & Tiny CPU tests against an independent full Hamiltonian and unchanged original helper routines.\\
+\code{tests/check_syntax.jl} & Base-only parser check for every top-level Julia script, including CUDA scripts without loading CUDA.\\
+\code{Project.toml}, \code{Manifest.toml} & Project dependencies and resolved package versions.\\
+\code{README.md} & Concise commands, status, limitations, and option reference.\\
+\code{docs/} & This PDF, editable source files, and \code{build_pdf.ps1} (two LaTeX passes to refresh links and contents).\\
+\code{results/} & Local validation outputs; future run reports go here by default.\\
+\bottomrule
+\end{longtable}
+
+\subsection{Configuration and the general backend interface}
+\code{Model} stores $N,x,y,m,\theta,g$ and the initial spin. \code{Solver} stores numerical settings separately, so changing accuracy controls cannot silently redefine the model. \code{validate} checks sizes and finite parameter values; \code{initial_labels} enforces spin parity and constructs the initial product state.
+
+\code{Backend} stores a name, an upload function, a download function, a synchronization function, and metadata. This is the general version requested alongside NVIDIA: the algorithm depends on these capabilities rather than a GPU vendor name. The CPU adapter uses independent copies and a no-op synchronization. This avoids aliasing a mutable initial state between runs.
+
+An illustrative interface use is:
+\begin{lstlisting}
+backend = Backend("my_device", upload_tensor_network,
+                  download_tensor_network, synchronize_device)
+run_case(model, solver, backend)
+\end{lstlisting}
+This is an interface example, not executable vendor support. A new backend must provide compatible ITensor storage and all operations reached by the solver, retain Float64, and pass the same tests. Metal's precision restrictions and backend decomposition limitations mean that simply replacing a package name is insufficient [1].
+
+\subsection{Hamiltonian and starting state}
+\code{gauge_mpo} directly implements $W_j$ with explicit link, output, and input indices. Its nested \code{block!} writes a $2\times2$ operator into a chosen virtual block. All such scalar writes occur on the CPU before any upload. \code{build_problem} creates dense spin sites, the hopping and mass OpSums, the gauge MPO, the direct-sum Hamiltonian, and the product MPS. It returns the individual pieces as well as the total for validation and reuse.
+
+There are no model-specific GPU kernels to maintain. MPO preparation is small compared with large-bond DMRG, and the new code uploads the complete prepared MPO and MPS once per solve. The gauge MPO's small virtual dimension is retained. Production runs never call the independent dense-matrix test routine.
+
+\subsection{The NVIDIA adapter}
+\code{cuda_backend} checks \code{CUDA.functional()}, selects a zero-based device ID, and disables accidental scalar indexing on GPU arrays. It uploads using
+\begin{lstlisting}
+adapt(CUDA.CuArray, tensor_network)
+\end{lstlisting}
+and downloads with \code{adapt(Array, tensor_network)}. Using \code{adapt} explicitly matters: the convenient \code{cu(...)} conversion normally changes floating-point input to Float32 [2]. A CPU/GPU comparison that changes precision at the same time would conflate two experiments.
+
+Tensor index bookkeeping and Julia control flow remain on the CPU. The storage selected by the adapter dispatches the heavy numerical operations to the GPU libraries through ITensor's extensions. CUDA synchronization is called before and after timing to wait for asynchronous device work. The optional cuTENSOR package is not required or installed by this implementation; the basic CUDA path is the initial target [1].
+
+The adapter records the CUDA package version, device name, device ID, and precision. It raises an error when CUDA is unavailable; it never silently labels a CPU fallback as GPU timing. Device-storage assertions in \code{check_cuda.jl} are intended to catch an unsuccessful conversion before the larger comparison.
+
+\subsection{Optimization and observables}
+\code{EnergyObserver} holds the convergence history and one maximum truncation error per sweep. Its \code{measure!} hook accumulates errors from individual bonds; its \code{checkdone!} hook implements the zero-safe stopping rule. These are separate from the diagnostics that evaluate the final state.
+
+\code{solve} seeds the host random generator, synchronizes the device, and times the loop over target states. Every optimization starts from a fresh copy of the same input MPS. Ground-state DMRG uses $H$; later states use the orthogonality penalties. Physical expectations are computed after the DMRG timing interval. Host seeding does not guarantee bitwise identity across hardware: decomposition algorithms and reduction orders can differ, even for identical initial tensors.
+
+\code{diagnostics} downloads each final state and the Hamiltonian once, then computes on the host:
+\begin{align}
+n_\psi &= \langle\psi|\psi\rangle, &
+E&=\frac{\langle\psi|H|\psi\rangle}{n_\psi},\\
+\sigma_H^2&=\frac{\langle\psi|H^2|\psi\rangle}{n_\psi}-E^2, &
+r&=\sqrt{\max(0,\sigma_H^2)}.
+\end{align}
+For a Hermitian $H$, $r$ is the norm of the eigenstate residual divided by $\|\psi\|$ in exact arithmetic. The calculation evaluates $\langle H\psi|H\psi\rangle$ by a tensor-network contraction without explicitly constructing an $H^2$ MPO. The raw variance is saved because floating-point cancellation can make a tiny variance negative. A clipped zero is not a certificate of exactness; near the roundoff floor, compute a more stable residual or use higher precision if needed.
+
+The same diagnostic records total $S^z$, actual maximum MPS bond dimension, completed sweep count, energy-stopping flag, and absolute normalized overlaps among target states. The flag indicates the specified energy test, not proof of ground-state convergence. A residual can be small for an excited eigenstate too, so it must be interpreted with the variational search and tiny exact checks.
+
+\code{entropy_profile} uses host MPS tensors, visits every bond, squares Schmidt singular values, normalizes their probabilities, and skips zero entries in the logarithm. It returns $S_b=-\sum_a p_{b,a}\log p_{b,a}$ (natural logarithms, in nats) and the original chord coordinate. \code{middle_tensors} returns the canonical middle tensor, two-site tensor, fused tensor, and combiner, using a copy to avoid changing the caller's MPS gauge.
+
+\subsection{Running, parsing, and saving}
+\code{run_case} validates the configuration, builds or accepts a shared problem, times transfers, calls the solver, and calculates diagnostics. \code{write_result} writes TOML containing model and solver fields, software versions, backend metadata, times, per-state observables, and overlaps. The helper \code{fields} converts a configuration struct into a dictionary.
+
+\code{parse_options} accepts only \code{--key=value} arguments, rejects duplicates and unknown option names, and \code{options_config} converts strings into typed parameters. Odd-chain defaults are resolved there. \code{main} selects BLAS thread count, obtains the requested backend, runs a case, and prints energies and convergence status. The two runner files only choose the backend; they do not duplicate the physics.
+
+The result object in Julia contains MPS states. TOML files contain scalar data and histories, not wavefunction checkpoints. Single-run default filenames are reused; choose a distinct \code{--output} path to retain multiple runs. The benchmark creates a unique output directory by default. Recorded timestamps use the executing machine's clock; keep that machine's timezone with research records if comparing runs across sites.
+
+\subsection{Comparison runner}
+\code{compare_case} builds one host problem and uses its identical physical index identities and initial state for both backends. It saves the two run reports and a comparison report. In addition to energy differences, it computes the phase-independent normalized fidelity
+\begin{equation}
+F=\frac{|\langle\psi_{\rm CPU}|\psi_{\rm GPU}\rangle|^2}
+{\langle\psi_{\rm CPU}|\psi_{\rm CPU}\rangle\langle\psi_{\rm GPU}|\psi_{\rm GPU}\rangle}.
+\end{equation}
+The initial energy-agreement rule is $|E_G-E_C|\leq10^{-8}+10^{-9}|E_C|$. This is a practical comparison threshold, not an uncertainty estimate. Near a degeneracy, two valid ground-state vectors can have a lower fidelity while spanning the same low-energy subspace; compare subspaces or suitable observables before calling that a numerical failure.
+
+\code{benchmark} loops over every integer in the requested range. It performs one unmeasured full run at each size for each backend, followed by three measured repeats by default. It summarizes the median DMRG time on each backend and the ratio of medians. CPU currently runs before GPU within each pair; order is not randomized, so thermal or background-load effects should be checked in a later performance study.
+
+\section{Correctness checks and their limits}
+\subsection{Independent tests before the study}
+The test file constructs a dense matrix for $N\leq6$ using spin configurations and bit flips, independently of the MPO builder. Each diagonal is the sum of electric, staggered mass, and interaction energies. Each neighboring opposite-spin pair produces an off-diagonal hop. This tests the physical signs, $\tfrac12$ factors, open boundary, $xg$ coefficient, background angle, and constant energy offset.
+
+For $N=2,3,4,5,6$ and $\theta=0,\pi,0.73$, the tests use nonzero $g$, nonunit $y$, and a different mass, so agreement is not confined to the default zero-interaction case. The entire matrix is compared to the new MPO. The original gauge MPO and manual direct sum are independently compared to the new versions. The unchanged original helper is included inside a Julia module; its driver, which would launch $N=20$, is never executed by this suite.
+
+Small DMRG calculations for $N=4,5,6$ compare ground-state energies with full diagonalization, and check normalization, residuals, stopping flags, and entropy at all cuts against an independent full-state SVD. The $N=4$ case also calls the original \code{Schwinger} routine. A two-state $N=4$ test checks physical excited energies and overlap. Product-state entropy and the dimension-four fusion are tested too. A host adapter exercises the general comparison/reporting interface without pretending to be a GPU.
+
+These correctness tests use increased sweeps/local iterations, sufficient bond dimension, and zero noise, rather than claiming the original ten-sweep settings are converged. The original solver retains its internal settings when called. Exact tests are intentionally tiny: at $N=20$ a dense real matrix would have $2^{40}$ entries, requiring about 8 TiB just for its entries. Matrix-free exact methods or restricted sectors are a different possible project, not part of the production DMRG port.
+
+\subsection{Observed local validation}
+\input{validation_results.tex}
+
+\subsection{GPU checks that remain to be run}
+On a real NVIDIA device, \code{check_cuda.jl} must verify Float64 MPO storage on GPU and an $N=4$ comparison. Extend this to nonzero $g$, nonzero background angles, odd chains, and the excited-state branch before relying on those modes for research. The current CUDA adapter and library dispatch have not been exercised on this Intel-only machine. A successful CPU test validates the shared mathematics and control flow, not vendor-specific execution.
+
+\section{Commands for review, small checks, and the later study}
+From the repository root, enter \code{GPU implementation/} first. Run all the following commands inside that folder. The unchanged local reference sources used by the tests are bundled in \code{reference/}. The saved manifest began from this machine's installed Julia environment. The setup step resolves and installs the new project's CUDA dependency on the target machine; preserve its resulting manifest with future measurements.
+
+\subsection{Portable CPU execution}
+\begin{lstlisting}
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
+julia --project=. tests/runtests.jl
+julia --project=. run_cpu.jl --N=4 --maxdim=16 --nsweeps=12
+\end{lstlisting}
+The first Julia execution may spend substantial time precompiling. That compilation must not be interpreted as DMRG runtime. In this editing session, restricted Windows execution prevented Julia from opening precompilation subprocess pipes, so the validation needed execution outside that sandbox. This is an execution-environment issue, not a GPU requirement.
+
+\subsection{NVIDIA setup and first real-device check}
+\begin{lstlisting}
+julia --project=. setup_cuda.jl
+julia --project=. check_cuda.jl
+julia --project=. run_cuda.jl --N=4 --maxdim=16 --nsweeps=12
+\end{lstlisting}
+Use a machine with an NVIDIA GPU, a suitable driver, and Julia. The CUDA package normally manages its runtime dependencies [4]. Device IDs are zero-based; select another device with \code{--device=1}. No CUDA installation can turn the detected Intel UHD Graphics 620 into an NVIDIA device.
+
+\subsection{After reading the guide: $N=10,\ldots,20$}
+\begin{lstlisting}
+julia --project=. benchmark.jl --sizes=10:20 --repeats=3 --warmup=true
+\end{lstlisting}
+This includes odd sizes. If the physical question instead requires zero initial spin at every size, compare the even subsequence separately. Do not silently label a half-integer odd-chain calculation as spin zero. The benchmark uses the original model and solver settings, with the documented observer corrections. It compares the new CPU and GPU paths; tiny tests provide the link back to the original implementation.
+
+If energy, residual, or bond-dimension convergence is inadequate, repeat both backends with improved controls, for example:
+\begin{lstlisting}
+julia --project=. benchmark.jl --sizes=10:20 --nsweeps=30 --maxdim=200 --eig_maxiter=5 --noise=0 --repeats=3
+\end{lstlisting}
+This is a separate convergence experiment. Turning noise off may change optimization robustness; do not accept it automatically as a better ground-state search. For strict fixed-sweep timing, add \code{--energy_tol=0} to both paths. To extend the size range later, change \code{--sizes=22:40}; first check convergence and memory at a few individual sizes.
+
+\subsection{Options and interpretation of outputs}
+Model options are \code{N,x,y,mass,theta,g,spin}. Solver options are \code{nsweeps,maxdim,cutoff,noise,energy_tol,min_sweeps,krylovdim,eig_maxiter,eig_tol,num_states,seed,outputlevel}. Runtime options include \code{blas_threads}, \code{device}, and \code{output}. Benchmark controls are \code{sizes,repeats,warmup,directory}. Theta must be a numeric value in radians; its default is $\pi$, but the parser does not evaluate expressions such as \code{--theta=pi}.
+
+Read per-state \code{energy}, \code{variance_raw}, \code{residual_norm}, \code{energy_converged}, \code{maxlinkdim}, and \code{sweep_max_truncation_error} together. Comparison reports add energy agreement and fidelity. A large speedup is not useful if either solution is inaccurate. Conversely, a slightly different stopping sweep can change total runtime without indicating faster per-update kernels.
+
+\section{Performance expectations and a defensible extended study}
+\subsection{Why small GPU runs can be slower}
+GPU parallelism helps when contractions and decompositions are large enough to amortize launch and scheduling overhead. At small $N$ and modest $\chi$, many matrices are small; a CPU can finish them before GPU overhead is recovered. The two-site DMRG sweep also has a sequential dependency along the chain. GPU acceleration applies within numerical operations, not by updating all bonds independently.
+
+As a rough guide, an interior two-site tensor has $d^2\chi^2$ entries, and decompositions of matrices with dimensions proportional to $d\chi$ have cubic work in that scale. Actual costs also depend on MPO dimension, environment contractions, noise, eigensolver iterations, and library workspaces. The memory model includes MPS tensors, MPO tensors, left/right environments, Krylov vectors, and decomposition scratch space. Device memory capacity alone does not establish feasible $N$ or converged $\chi$.
+
+\subsection{What is timed}
+Reports distinguish host Hamiltonian construction, upload/copy time, and synchronized DMRG time. The DMRG timer excludes physical-energy recomputation, host downloads, full diagnostics, report writing, and process startup. It includes observer work and, for multiple states, all penalized optimizations. Total end-to-end latency is therefore greater. First-run times may include compilation; same-size warmup is enabled for the benchmark.
+
+For an interpretable comparison, keep model parameters, precision, initial tensors, solver settings, and CPU BLAS threads identical. Record the machine and driver, the resulting manifest, warmup choice, number of repeats, and background load. The script records much of the software/device configuration; \code{CUDA.versioninfo()} supplies additional runtime/driver context in the smoke-check output. Thread counts and a single median do not fully characterize noise, so retain individual repeats.
+
+\subsection{Suggested research progression}
+First establish tiny-system exact agreement, then real-device agreement, then the requested $N=10$ through $20$ baseline. Next study convergence in $\chi$, sweep count, local eigensolver accuracy, and initialization. Only then examine larger chains and physical changes such as $m$, $\theta$, or $g$. Useful observables include energy density, gaps with verified orthogonality, spatial charge/electric profiles, and entanglement scaling.
+
+Separate numerical extrapolation from physical finite-size extrapolation. Changing the mass convention, adding constant terms, enforcing a different spin sector, or switching precision changes the comparison. The current output provides energies and basic diagnostics; richer observables and portable MPS checkpointing are natural follow-up implementations, not data already produced. At $\theta=\pi$ or near competing low-energy states, use multiple starts and subspace-sensitive diagnostics before making claims about gaps or phases.
+
+\section{Sources and reproducibility}
+The model derivation and original-code audit above are based on the supplied local Julia files. Library behavior was checked against official documentation and the installed package source. The following are reference URLs; GPU capabilities can change between package versions.
+\begin{enumerate}
+\item ITensor GPU backends: \url{https://docs.itensor.org/ITensors/v0.7/RunningOnGPUs.html}. A versioned capability reference; verify the packages installed on the target machine.
+\item CUDA.jl memory and type-preserving upload: \url{https://cuda.juliagpu.org/stable/usage/memory/}.
+\item ITensorMPS DMRG API, settings, and penalized energies: \url{https://docs.itensor.org/ITensorMPS/stable/DMRG.html}.
+\item CUDA.jl installation: \url{https://cuda.juliagpu.org/stable/installation/overview/}.
+\end{enumerate}
+The reference files' SHA-256 values are recorded in \code{original_files.sha256}. They allow a later check that the original sources remained unchanged. The new project owns its dependency files; the user's global Julia project is not edited by the provided setup script.

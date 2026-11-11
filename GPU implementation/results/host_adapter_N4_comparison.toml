@@ -1,0 +1,36 @@
+atol = 1.0e-8
+cpu_dmrg_seconds = 0.0618023
+dmrg_speedup = 1.1811395470173514
+gpu_dmrg_seconds = 0.0523243
+rtol = 1.0e-9
+timing_note = "DMRG only; excludes setup, transfer, diagnostics. Warm up before interpretation."
+
+[model]
+N = 4
+g = 0.0
+mass = 0.33
+spin = 0.0
+theta = 3.141592653589793
+x = 10.0
+y = 1.0
+
+[solver]
+cutoff = 0.0
+eig_maxiter = 5
+eig_tol = 1.0e-14
+energy_tol = 1.0e-10
+krylovdim = 10
+maxdim = 16
+min_sweeps = 2
+noise = 0.0
+nsweeps = 10
+num_states = 1
+outputlevel = 0
+seed = 1234
+
+[[states]]
+both_energy_converged = true
+energy_abs_difference = 0.0
+energy_agrees = true
+fidelity = 1.0
+state = 0

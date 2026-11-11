@@ -1,0 +1,14 @@
+# Local Julia caches
+.julia_depot/
+# LaTeX build intermediates (the PDF and sources are versioned)
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.toc
+docs/*.synctex.gz
+docs/build-output.txt
+# New experiment output: explicitly add reviewed evidence when validated
+results/benchmark_*/
+results/cpu_N*.toml
+results/cuda_N*.toml
+results/cuda_smoke_*.toml

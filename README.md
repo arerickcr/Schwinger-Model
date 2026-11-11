@@ -21,6 +21,10 @@ Source: E. Arguello Cruz, G. Tarnopolsky, and Y. Xin, [*Precision study of the m
 
 The table describes the published study. The scripts here are compact computational examples, not an archived reproduction of every large-system run or figure in the paper.
 
+## Additional GPU implementation (validation pending)
+
+The separate [GPU implementation](GPU%20implementation/README.md) folder contains a shared CPU solver, an NVIDIA CUDA backend, comparison scripts, unchanged local reference sources, and a [detailed PDF guide](GPU%20implementation/docs/Schwinger_GPU_guide.pdf). **The CUDA path has not yet been run or validated on an NVIDIA GPU.** Historical tiny-system CPU checks do not establish GPU correctness or performance; the N=10 through 20 CPU/GPU study remains pending. See the [validation record and checklist](GPU%20implementation/VALIDATION.md). The original Julia scripts and their environment remain unchanged.
+
 ## 3. Reproduce
 
 Install Julia 1.12.4 and Git, then instantiate the recorded project-local environment:
