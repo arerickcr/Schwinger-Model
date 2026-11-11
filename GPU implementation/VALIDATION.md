@@ -1,8 +1,8 @@
 # Validation status
 
-**GPU validation: PENDING.** Publication date: November 11, 2026. This is an experimental implementation; the results below validate only the CPU path. No CUDA execution, GPU comparison, GPU timing, or N=10 through 20 study has been completed.
+**GPU validation: PENDING.** This is an experimental implementation; the results below validate only the CPU path. No CUDA execution, GPU comparison, GPU timing, or N=10 through 20 study has been completed.
 
-## Historical CPU validation - October 22, 2026
+## Historical CPU validation
 
 All **115 checks passed**, with no failures or errors:
 
