@@ -10,11 +10,6 @@ Read [the detailed PDF guide](docs/Schwinger_GPU_guide.pdf) for the Hamiltonian 
 
 - Portable CPU solver and backend interface: implemented.
 - NVIDIA CUDA adapter: implemented, **not yet executed on an NVIDIA GPU**.
-- This computer reports **Intel UHD Graphics 620**, not an NVIDIA device. Do not use its integrated GPU with `run_cuda.jl`.
-- A general backend interface is provided, not a claim that all GPU vendors can run ITensor DMRG. CPU is the tested portable fallback. AMD/Metal/Intel adapters are not supplied as validated implementations.
-- N=10 through 20 benchmarking is a separate, explicit command, to run after reviewing the guide. Setup and tests do not launch that study.
-
-Historical CPU validation (October 22, 2026): **115 checks passed**. N=4,5,6 ground-state energies agree with independent exact diagonalization within 1.5e-14; original-helper, excited-state, entropy, and report checks also pass. See `results/validation_log.txt` and `VALIDATION.md`. This does not validate CUDA execution.
 
 ## Setup and CPU check
 
